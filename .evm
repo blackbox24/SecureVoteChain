@@ -1,0 +1,6 @@
+# For ThirdWeb integration (if used)
+VITE_THIRDWEB_CLIENT_ID=56da8e0445a8e7d4bba63b5528555c2a
+VITE_THIRDWEB_SECRET_KEY=yCQhB0BOB1od_gEBZAuwHJDP-RGlNGT6rn9d-eHrPfrmjoulpeTiPyq0P5MSZpX6cz8X-sB3G4_OX56FCXaGtQ
+
+# For blockchain network configuration
+VITE_BLOCKCHAIN_RPC_URL=your_blockchain_rpc_url_here

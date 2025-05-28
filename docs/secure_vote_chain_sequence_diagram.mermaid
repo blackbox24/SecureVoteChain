@@ -1,0 +1,109 @@
+sequenceDiagram
+    participant Voter
+    participant VoterUI as Voter Interface
+    participant EC as Electoral Commission
+    participant ECUI as EC Interface
+    participant VS as VotingSystem Contract
+    participant VR as VoterRegistry Contract
+    participant CR as CandidateRegistry Contract
+    participant BS as BallotSystem Contract
+    participant RTRS as RealTimeResultService
+    participant EI as EventIndexer
+    participant W3C as Web3Connector
+    participant VAPI as VoterVerificationAPI
+
+    %% System Initialization
+    EC->>ECUI: Login with Wallet
+    ECUI->>W3C: connectToWallet()
+    W3C-->>ECUI: Return wallet address
+    ECUI->>VS: Deployer creates VotingSystem
+    VS->>VS: constructor(admin = msg.sender)
+    EC->>ECUI: Deploy voter registry
+    ECUI->>VR: Deploy VoterRegistry
+    VR->>VR: constructor(votingSystem)
+    EC->>ECUI: Deploy candidate registry
+    ECUI->>CR: Deploy CandidateRegistry
+    CR->>CR: constructor(votingSystem)
+    EC->>ECUI: Deploy ballot system
+    ECUI->>BS: Deploy BallotSystem
+    BS->>BS: constructor(votingSystem, voterRegistry, candidateRegistry)
+
+    %% Electoral Commission Setup
+    EC->>ECUI: Register Electoral Commission Members
+    ECUI->>VS: addElectoralCommissionMember(address)
+    VS-->>ECUI: Confirm member added
+    EC->>ECUI: Register Voters
+    ECUI->>VAPI: verifyVoterId(voterId)
+    VAPI-->>ECUI: Return verification result
+    ECUI->>VR: registerVoter(voterId, walletAddress)
+    VR-->>ECUI: Confirm voter registered
+    EC->>ECUI: Register Candidates
+    ECUI->>CR: registerCandidate(name, information, imageHash)
+    CR-->>ECUI: Confirm candidate registered
+    
+    %% Start Election
+    EC->>ECUI: Start Election
+    ECUI->>VS: startElection(durationInHours)
+    VS->>VS: electionActive = true; set start & end time
+    VS-->>ECUI: Confirm election started
+    Note over VS,EI: Election is now active
+    
+    %% Voter Authentication & Voting
+    Voter->>VoterUI: Enter Voter ID
+    VoterUI->>VAPI: verifyVoterId(voterId)
+    VAPI-->>VoterUI: Verification success
+    Voter->>VoterUI: Connect Wallet
+    VoterUI->>W3C: connectToWallet()
+    W3C-->>VoterUI: Return wallet address
+    VoterUI->>VR: verifyVoter(voterId, walletAddress)
+    VR-->>VoterUI: Verification success
+    VoterUI->>CR: getAllCandidates()
+    CR-->>VoterUI: Return candidates list
+    
+    %% Voting Process
+    Voter->>VoterUI: Select candidate and vote
+    VoterUI->>BS: castVote(candidateId)
+    BS->>VR: isRegisteredVoter(msg.sender)
+    VR-->>BS: Return true
+    BS->>VR: hasVoterVoted(msg.sender)
+    VR-->>BS: Return false
+    BS->>VS: isElectionActive()
+    VS-->>BS: Return true
+    BS->>CR: Increment candidate vote count
+    BS->>VR: markVoted(msg.sender)
+    BS->>BS: Store voter's choice
+    BS-->>VoterUI: Vote successfully cast
+    
+    %% Real-Time Results
+    BS->>EI: Emit VoteCast event
+    EI->>RTRS: Process vote event
+    RTRS->>RTRS: Update vote counts
+    
+    %% View Results
+    Voter->>VoterUI: View Results
+    VoterUI->>RTRS: subscribeToResults(callback)
+    RTRS-->>VoterUI: Send initial results
+    RTRS-->>VoterUI: Send real-time updates
+    
+    %% Election Monitoring
+    EC->>ECUI: Monitor Election
+    ECUI->>RTRS: subscribeToResults(callback)
+    RTRS-->>ECUI: Send real-time updates
+    ECUI->>VS: getElectionDetails()
+    VS-->>ECUI: Return election status
+    ECUI->>VR: getRegisteredVoterCount(), getVoterTurnout()
+    VR-->>ECUI: Return voter statistics
+    
+    %% End Election
+    EC->>ECUI: End Election
+    ECUI->>VS: endElection()
+    VS->>VS: electionActive = false
+    VS-->>ECUI: Confirm election ended
+    
+    %% Final Results
+    EC->>ECUI: View Final Results
+    ECUI->>BS: getCurrentResults()
+    BS-->>ECUI: Return final vote tallies
+    Voter->>VoterUI: View Final Results
+    VoterUI->>BS: getCurrentResults()
+    BS-->>VoterUI: Return final vote tallies

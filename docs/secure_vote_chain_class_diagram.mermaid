@@ -1,0 +1,157 @@
+classDiagram
+    class VotingSystem {
+        <<Smart Contract>>
+        -address admin
+        -bool electionActive
+        -uint256 electionStartTime
+        -uint256 electionEndTime
+        -mapping(address => bool) electoralCommission
+        +constructor(address _admin)
+        +startElection(uint256 duration)
+        +endElection()
+        +isElectionActive() bool
+        +addElectoralCommissionMember(address member)
+        +removeElectoralCommissionMember(address member)
+        +isElectoralCommissionMember(address account) bool
+        +getElectionDetails() ElectionDetails
+        +onlyAdmin() modifier
+        +onlyElectoralCommission() modifier
+        +electionMustBeActive() modifier
+        +electionMustNotBeActive() modifier
+    }
+    
+    class VoterRegistry {
+        <<Smart Contract>>
+        -mapping(string => address) voterIdToAddress
+        -mapping(address => bool) registeredVoters
+        -mapping(address => bool) hasVoted
+        +registerVoter(string voterId, address voterWallet)
+        +verifyVoter(string voterId, address wallet) bool
+        +markVoted(address voter)
+        +hasVoterVoted(address voter) bool
+        +isRegisteredVoter(address voter) bool
+        +getRegisteredVoterCount() uint256
+        +getVoterTurnout() uint256
+        +onlyElectoralCommission() modifier
+    }
+    
+    class CandidateRegistry {
+        <<Smart Contract>>
+        -struct Candidate {
+            uint256 id
+            string name
+            string information
+            string imageHash
+            uint256 voteCount
+        }
+        -mapping(uint256 => Candidate) candidates
+        -uint256 candidateCount
+        +registerCandidate(string name, string information, string imageHash)
+        +getCandidateDetails(uint256 candidateId) Candidate
+        +getAllCandidates() Candidate[]
+        +getCandidateCount() uint256
+        +onlyElectoralCommission() modifier
+    }
+    
+    class BallotSystem {
+        <<Smart Contract>>
+        -mapping(address => uint256) voterToCandidateId
+        +castVote(uint256 candidateId)
+        +getCurrentResults() CandidateVoteCount[]
+        +getVoterChoice(address voter) uint256
+        +getTotalVotes() uint256
+        +voterMustBeRegistered() modifier
+        +voterMustNotHaveVoted() modifier
+        +electionMustBeActive() modifier
+    }
+    
+    class ElectoralCommissionService {
+        <<Frontend Service>>
+        -web3Provider
+        -votingSystemContract
+        -voterRegistryContract
+        -candidateRegistryContract
+        +connectWallet() address
+        +startElection(uint256 durationInHours)
+        +endElection()
+        +registerVoter(string voterId, address wallet)
+        +bulkRegisterVoters(VoterData[] voters)
+        +registerCandidate(string name, string information, File image)
+        +getElectionStatistics() ElectionStats
+        +getVoterList() VoterInfo[]
+        +getCandidateList() CandidateInfo[]
+    }
+    
+    class VoterService {
+        <<Frontend Service>>
+        -web3Provider
+        -votingSystemContract
+        -voterRegistryContract
+        -candidateRegistryContract
+        -ballotSystemContract
+        +connectWallet() address
+        +loginWithVoterId(string voterId) bool
+        +getCandidates() CandidateInfo[]
+        +castVote(uint256 candidateId)
+        +getRealTimeResults() CandidateVoteCount[]
+        +hasVoted() bool
+        +isElectionActive() bool
+    }
+    
+    class Web3Connector {
+        <<Utility>>
+        -provider
+        -signer
+        +connectToWallet() address
+        +getProvider() Web3Provider
+        +getSigner() Web3Signer
+        +executeTransaction(transaction) TransactionReceipt
+        +listenForEvent(eventName, callback)
+    }
+    
+    class RealTimeResultService {
+        <<Service>>
+        -socket
+        -candidates
+        -voteCountMap
+        +initialize()
+        +subscribeToResults(callback)
+        +unsubscribe()
+        +getFormattedResults() FormattedResult[]
+    }
+    
+    class VoterVerificationAPI {
+        <<API Service>>
+        +verifyVoterId(string voterId) VerificationResult
+        +linkWalletToVoterId(string voterId, address wallet) bool
+    }
+    
+    class EventIndexer {
+        <<Middleware>>
+        -votingSystemContract
+        -lastProcessedBlock
+        +indexVotingEvents()
+        +getRecentVotes() VoteEvent[]
+        +processBallotEvents()
+    }
+    
+    VotingSystem --> VoterRegistry : manages
+    VotingSystem --> CandidateRegistry : manages
+    VotingSystem --> BallotSystem : manages
+    VoterRegistry "1" -- "*" BallotSystem : validates voters
+    CandidateRegistry "1" -- "*" BallotSystem : provides candidates
+    ElectoralCommissionService --> VotingSystem : administers
+    ElectoralCommissionService --> VoterRegistry : manages voters
+    ElectoralCommissionService --> CandidateRegistry : manages candidates
+    VoterService --> VotingSystem : interacts with
+    VoterService --> VoterRegistry : authenticates through
+    VoterService --> BallotSystem : casts votes via
+    VoterService --> CandidateRegistry : views candidates via
+    VoterService --> RealTimeResultService : consumes
+    ElectoralCommissionService --> RealTimeResultService : monitors
+    Web3Connector --> VoterService : used by
+    Web3Connector --> ElectoralCommissionService : used by
+    VoterService --> VoterVerificationAPI : validates voter ID
+    EventIndexer --> VotingSystem : monitors events
+    EventIndexer --> BallotSystem : processes vote events
+    RealTimeResultService --> EventIndexer : consumes events from
