@@ -1,6 +1,6 @@
 // src/contexts/AuthContext.jsx
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { useAddress, useDisconnect, useMetamask, useContract } from '@thirdweb-dev/react';
+import { useAddress, useDisconnect, useConnect, useMetamask } from '@thirdweb-dev/react';
 import { toast } from 'react-toastify';
 import { useSelector } from 'react-redux';
 
@@ -21,12 +21,11 @@ export const AuthProvider = ({ children }) => {
   // Get voters data from Redux store
   const { voters } = useSelector(state => state.election);
   
-  // For development purposes - mock voter registration contract
-  // In production, this would be replaced with actual contract calls
+  // Admin wallet addresses
   const adminAddresses = [
     "0xEC00000000000000000000000000000000000001",
     "0xEC00000000000000000000000000000000000002",
-    "0x64E01a30a963206345bE12DEcEcDA08d78c9a2a5" // User-provided admin wallet address
+    "0x64E01a30a963206345bE12DEcEcDA08d78c9a2a5"
   ];
 
   useEffect(() => {
@@ -36,10 +35,10 @@ export const AuthProvider = ({ children }) => {
       try {
         if (address) {
           // Check if user is admin
-          const adminStatus = adminAddresses.includes(address);
+          const adminStatus = adminAddresses.map(addr => addr.toLowerCase())
+            .includes(address.toLowerCase());
           setIsAdmin(adminStatus);
           
-          // Store role in localStorage for protected routes
           if (adminStatus) {
             localStorage.setItem('userRole', 'admin');
             localStorage.setItem('isAuthenticated', 'true');
@@ -47,25 +46,23 @@ export const AuthProvider = ({ children }) => {
             setUserInfo({
               address,
               isAdmin: true,
-              hasVoted: false, // Admins don't vote
-              voterId: "EC-ADMIN" // Special admin ID
+              hasVoted: false,
+              voterId: "EC-ADMIN"
             });
             setRegistrationStatus('admin');
           } else {
-            // Check if address is registered as a voter in the Redux store
+            // Check if address is registered as a voter
             const voterRecord = voters.find(voter => 
               voter.walletAddress && 
               voter.walletAddress.toLowerCase() === address.toLowerCase()
             );
             
             if (voterRecord) {
-              // Check verification status using either naming convention (verified or isVerified)
               const isVerified = voterRecord.verified || voterRecord.isVerified;
               const isPending = voterRecord.isPending !== undefined ? voterRecord.isPending : !isVerified;
               const isRegistered = voterRecord.isRegistered !== undefined ? voterRecord.isRegistered : true;
               
               if (isVerified) {
-                // Verified voter
                 localStorage.setItem('userRole', 'voter');
                 localStorage.setItem('isAuthenticated', 'true');
                 
@@ -77,50 +74,15 @@ export const AuthProvider = ({ children }) => {
                   fullName: voterRecord.personalInfo?.name || voterRecord.fullName,
                   isVerified: true,
                   isPending: false,
-                  isRegistered: true
                 });
                 setRegistrationStatus('verified');
-              } else if (isPending && isRegistered) {
-                // Voter registration pending verification
-                setUserInfo({
-                  address,
-                  isAdmin: false,
-                  voterId: voterRecord.id,
-                  isPending: true,
-                  isRegistered: true,
-                  isVerified: false
-                });
+              } else if (isPending) {
                 setRegistrationStatus('pending');
-                
-                localStorage.removeItem('userRole');
-                localStorage.removeItem('isAuthenticated');
               } else {
-                // Registered but not verified or pending (unusual state)
-                setUserInfo({
-                  address,
-                  isAdmin: false,
-                  voterId: voterRecord.id,
-                  isPending: isPending,
-                  isRegistered: isRegistered,
-                  isVerified: isVerified
-                });
-                setRegistrationStatus('unknown');
-                
-                localStorage.removeItem('userRole');
-                localStorage.removeItem('isAuthenticated');
+                setRegistrationStatus('unregistered');
               }
             } else {
-              // User is not registered
-              setUserInfo({
-                address,
-                isRegistered: false,
-                isVerified: false,
-                isPending: false
-              });
               setRegistrationStatus('unregistered');
-              
-              localStorage.removeItem('userRole');
-              localStorage.removeItem('isAuthenticated');
             }
           }
         } else {
@@ -144,10 +106,16 @@ export const AuthProvider = ({ children }) => {
   
   const login = async () => {
     try {
+      if (typeof window.ethereum === 'undefined') {
+        toast.error('Please install MetaMask to connect your wallet');
+        window.open('https://metamask.io/download/', '_blank');
+        return;
+      }
+      
       await connect();
     } catch (error) {
       console.error("Connection failed:", error);
-      toast.error("Failed to connect wallet");
+      toast.error(error.message || "Failed to connect wallet");
     }
   };
   
