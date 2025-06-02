@@ -1,10 +1,10 @@
 // src/App.jsx
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { ChainId, ThirdwebProvider } from '@thirdweb-dev/react';
 import { Provider } from 'react-redux';
 import { ToastContainer } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
+import { ThirdwebProvider } from '@thirdweb-dev/react';
+import { Mumbai } from '@thirdweb-dev/chains';
 
 import store from './redux/store';
 import { AuthProvider } from './contexts/AuthContext';
@@ -46,13 +46,10 @@ const ProtectedRoute = ({ children, role }) => {
 };
 
 function App() {
-  // For development, use the Chain ID for the network you're working with
-  const activeChainId = ChainId.Mumbai; // Mumbai testnet for development
-  
   return (
     <ThirdwebProvider 
-      activeChain={activeChainId}
-      clientId={import.meta.env.VITE_THIRDWEB_CLIENT_ID || "YOUR_CLIENT_ID_HERE"}
+      activeChain={Mumbai}
+      clientId={import.meta.env.VITE_THIRDWEB_CLIENT_ID || ""}
     >
       <Provider store={store}>
         <AuthProvider>
